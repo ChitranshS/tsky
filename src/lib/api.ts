@@ -37,6 +37,7 @@ export const deleteTodo = (id: string) => fetcher(`/api/todos?id=${id}`, { metho
 export const reorderTodos = (todoIds: string[]) => fetcher('/api/todos/reorder', { method: 'PUT', body: JSON.stringify({ todoIds }) });
 
 // Notes
+
 export const getNotes = (date?: string) => {
     const params = new URLSearchParams();
     if (date) params.append('date', date);
