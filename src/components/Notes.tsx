@@ -354,9 +354,9 @@ const Notes = ({ selectedDate }: NotesProps) => {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-all">
-          <div className="bg-white text-gray-900 rounded-2xl shadow-2xl w-[90vw] h-[90vh] flex flex-col relative animate-fade-in font-sans overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                      <div className="bg-white text-gray-900 rounded-2xl shadow-2xl w-[90vw] h-[90vh] flex flex-col relative animate-fade-in font-sans overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-100 flex-shrink-0">
               <h2 className="text-xl font-semibold text-gray-900">
                 {isEditing ? (activeNote ? 'Edit Note' : 'New Note') : 'View Note'}
               </h2>
@@ -375,7 +375,7 @@ const Notes = ({ selectedDate }: NotesProps) => {
               {isEditing ? (
                 <div className="h-full flex flex-col">
                   {/* Enhanced Toolbar */}
-                  <div className="flex items-center gap-4 p-4 border-b border-gray-100 bg-gray-50">
+                  <div className="flex items-center gap-4 p-4 border-b border-gray-100 bg-gray-50 sticky top-0 z-10">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-medium text-gray-600">Format:</span>
                     </div>
@@ -477,14 +477,14 @@ const Notes = ({ selectedDate }: NotesProps) => {
                   </div>
                   
                   {/* Enhanced Content Area */}
-                  <div className="flex-1 p-6">
+                  <div className="flex-1 p-6 overflow-y-auto">
                     <div className="h-full flex flex-col">
                       <input
                         type="text"
                         value={title}
                         onChange={e => setTitle(e.target.value)}
                         placeholder="Note title..."
-                        className="w-full bg-transparent text-2xl font-bold mb-6 outline-none border-b border-gray-200 focus:border-yellow-400 transition-all pb-2"
+                        className="w-full bg-transparent text-2xl font-bold mb-6 outline-none border-b border-gray-200 focus:border-yellow-400 transition-all pb-2 flex-shrink-0"
                         style={{ fontFamily: 'inherit' }}
                       />
                       <div
