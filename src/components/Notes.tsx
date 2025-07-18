@@ -21,7 +21,7 @@ const Notes = ({ selectedDate }: NotesProps) => {
   const [showOnlyImportant, setShowOnlyImportant] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const contentEditableRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchNotes = async () => {
@@ -38,6 +38,13 @@ const Notes = ({ selectedDate }: NotesProps) => {
     };
     fetchNotes();
   }, [dateFilter, selectedDate]);
+
+  // Set content in contentEditable when entering edit mode
+  useEffect(() => {
+    if (isEditing && contentEditableRef.current && content) {
+      contentEditableRef.current.innerText = content;
+    }
+  }, [isEditing]);
 
   const handleAddNote = async () => {
     if (!title.trim()) return;
@@ -107,7 +114,20 @@ const Notes = ({ selectedDate }: NotesProps) => {
   };
 
   const truncate = (text: string, length: number) => {
-    return text.length > length ? text.substring(0, length) + '...' : text;
+    // Remove markdown syntax for preview
+    let cleanText = text
+      .replace(/^#+\s+/gm, '') // Remove headings
+      .replace(/^>\s+/gm, '') // Remove quote markers
+      .replace(/^[-*•]\s+/gm, '') // Remove bullet points
+      .replace(/^[\d]+\.\s+/gm, '') // Remove numbered lists
+      .replace(/```[\s\S]*?```/g, '') // Remove code blocks
+      .replace(/`([^`]+)`/g, '$1') // Remove inline code
+      .replace(/\*\*([^*]+)\*\*/g, '$1') // Remove bold
+      .replace(/\*([^*]+)\*/g, '$1') // Remove italic
+      .replace(/<u>([^<]+)<\/u>/g, '$1') // Remove underline
+      .trim();
+    
+    return cleanText.length > length ? cleanText.substring(0, length) + '...' : cleanText;
   };
 
   const formatDateTime = (dateString: string) => {
@@ -123,23 +143,124 @@ const Notes = ({ selectedDate }: NotesProps) => {
 
   const filteredNotes = showOnlyImportant ? notes.filter(n => n.isImportant) : notes;
 
-  // Markdown toolbar helpers
-  const insertMarkdown = (syntax: string, surround: boolean = true) => {
-    if (!textareaRef.current) return;
-    const textarea = textareaRef.current;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selected = content.substring(start, end);
-    let newText = '';
-    if (surround) {
-      newText = content.substring(0, start) + syntax + selected + syntax + content.substring(end);
-      textarea.setSelectionRange(start + syntax.length, end + syntax.length);
-    } else {
-      newText = content.substring(0, start) + syntax + content.substring(end);
-      textarea.setSelectionRange(start + syntax.length, start + syntax.length);
+  // Enhanced content editing functions
+  const handleContentChange = (e: React.FormEvent<HTMLDivElement>) => {
+    const newContent = e.currentTarget.innerText;
+    setContent(newContent);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      
+      const range = selection.getRangeAt(0);
+      const tabNode = document.createTextNode('\t');
+      range.deleteContents();
+      range.insertNode(tabNode);
+      range.setStartAfter(tabNode);
+      range.setEndAfter(tabNode);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      
+      // Update content state
+      if (contentEditableRef.current) {
+        setContent(contentEditableRef.current.innerText);
+      }
+    } else if (e.key === 'Enter') {
+      // Handle Enter key for better list formatting
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      
+      const range = selection.getRangeAt(0);
+      const currentNode = range.startContainer;
+      
+      // Check if we're at the beginning of a line with a bullet point
+      if (currentNode.nodeType === Node.TEXT_NODE) {
+        const text = currentNode.textContent || '';
+        const lineStart = text.lastIndexOf('\n', range.startOffset - 1) + 1;
+        const lineText = text.substring(lineStart, range.startOffset);
+        
+        // If we're at a bullet point, create a new bullet point
+        if (lineText.trim().match(/^[•\-\*]\s/)) {
+          e.preventDefault();
+          const newLineNode = document.createTextNode('\n• ');
+          range.deleteContents();
+          range.insertNode(newLineNode);
+          range.setStartAfter(newLineNode);
+          range.setEndAfter(newLineNode);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          
+          // Update content state
+          if (contentEditableRef.current) {
+            setContent(contentEditableRef.current.innerText);
+          }
+        }
+      }
     }
-    setContent(newText);
-    textarea.focus();
+  };
+
+  const insertText = (text: string) => {
+    if (!contentEditableRef.current) return;
+    
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    
+    const range = selection.getRangeAt(0);
+    const textNode = document.createTextNode(text);
+    range.deleteContents();
+    range.insertNode(textNode);
+    range.setStartAfter(textNode);
+    range.setEndAfter(textNode);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    
+    // Update content state
+    setContent(contentEditableRef.current.innerText);
+    contentEditableRef.current.focus();
+  };
+
+  const insertBulletPoint = () => {
+    insertText('• ');
+  };
+
+  const insertNumberedList = () => {
+    insertText('1. ');
+  };
+
+  const insertBold = () => {
+    insertText('**bold text**');
+  };
+
+  const insertItalic = () => {
+    insertText('*italic text*');
+  };
+
+  const insertUnderline = () => {
+    insertText('<u>underlined text</u>');
+  };
+
+  const insertHeading1 = () => {
+    insertText('# ');
+  };
+
+  const insertHeading2 = () => {
+    insertText('## ');
+  };
+
+  const insertHeading3 = () => {
+    insertText('### ');
+  };
+
+  const insertQuote = () => {
+    insertText('> ');
+  };
+
+  const insertCodeBlock = () => {
+    insertText('```\n\n```');
   };
 
   if (isLoading) {
@@ -182,6 +303,13 @@ const Notes = ({ selectedDate }: NotesProps) => {
               setIsEditing(true);
               setImportant(false);
               setIsModalOpen(true);
+              // Clear contentEditable div after modal opens
+              setTimeout(() => {
+                if (contentEditableRef.current) {
+                  contentEditableRef.current.innerText = '';
+                  contentEditableRef.current.focus();
+                }
+              }, 100);
             }}
             className="p-1 rounded-full hover:bg-gray-100"
             aria-label="Add note"
@@ -246,22 +374,62 @@ const Notes = ({ selectedDate }: NotesProps) => {
             <div className="flex-1 overflow-hidden">
               {isEditing ? (
                 <div className="h-full flex flex-col">
-                  {/* Toolbar */}
+                  {/* Enhanced Toolbar */}
                   <div className="flex items-center gap-4 p-4 border-b border-gray-100 bg-gray-50">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-gray-600">Font:</span>
-                      <span className="font-mono text-xs bg-white px-2 py-1 rounded border">Utopia Std</span>
+                      <span className="text-xs font-medium text-gray-600">Format:</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-gray-600">Size:</span>
-                      <span className="font-mono text-xs bg-white px-2 py-1 rounded border">16</span>
+                    <div className="flex items-center gap-1">
+                      <button 
+                        className="p-2 rounded hover:bg-white transition-all" 
+                        type="button" 
+                        onClick={insertHeading1}
+                        title="Heading 1"
+                      >
+                        <span className="font-bold text-sm">H1</span>
+                      </button>
+                      <button 
+                        className="p-2 rounded hover:bg-white transition-all" 
+                        type="button" 
+                        onClick={insertHeading2}
+                        title="Heading 2"
+                      >
+                        <span className="font-bold text-sm">H2</span>
+                      </button>
+                      <button 
+                        className="p-2 rounded hover:bg-white transition-all" 
+                        type="button" 
+                        onClick={insertHeading3}
+                        title="Heading 3"
+                      >
+                        <span className="font-bold text-sm">H3</span>
+                      </button>
                     </div>
                     <div className="w-px h-4 bg-gray-300"></div>
                     <div className="flex items-center gap-1">
                       <button 
                         className="p-2 rounded hover:bg-white transition-all" 
                         type="button" 
-                        onClick={() => insertMarkdown('**')}
+                        onClick={insertQuote}
+                        title="Quote"
+                      >
+                        <span className="text-sm">"</span>
+                      </button>
+                      <button 
+                        className="p-2 rounded hover:bg-white transition-all" 
+                        type="button" 
+                        onClick={insertCodeBlock}
+                        title="Code Block"
+                      >
+                        <span className="font-mono text-sm">{`{}`}</span>
+                      </button>
+                    </div>
+                    <div className="w-px h-4 bg-gray-300"></div>
+                    <div className="flex items-center gap-1">
+                      <button 
+                        className="p-2 rounded hover:bg-white transition-all" 
+                        type="button" 
+                        onClick={insertBold}
                         title="Bold"
                       >
                         <span className="font-bold text-sm">B</span>
@@ -269,7 +437,7 @@ const Notes = ({ selectedDate }: NotesProps) => {
                       <button 
                         className="p-2 rounded hover:bg-white transition-all" 
                         type="button" 
-                        onClick={() => insertMarkdown('*')}
+                        onClick={insertItalic}
                         title="Italic"
                       >
                         <span className="italic text-sm">I</span>
@@ -277,7 +445,7 @@ const Notes = ({ selectedDate }: NotesProps) => {
                       <button 
                         className="p-2 rounded hover:bg-white transition-all" 
                         type="button" 
-                        onClick={() => insertMarkdown('<u>', false)}
+                        onClick={insertUnderline}
                         title="Underline"
                       >
                         <span className="underline text-sm">U</span>
@@ -288,7 +456,7 @@ const Notes = ({ selectedDate }: NotesProps) => {
                       <button 
                         className="p-2 rounded hover:bg-white transition-all" 
                         type="button" 
-                        onClick={() => insertMarkdown('- ', false)}
+                        onClick={insertBulletPoint}
                         title="Bullet List"
                       >
                         <span className="text-sm">•</span>
@@ -296,15 +464,19 @@ const Notes = ({ selectedDate }: NotesProps) => {
                       <button 
                         className="p-2 rounded hover:bg-white transition-all" 
                         type="button" 
-                        onClick={() => insertMarkdown('1. ', false)}
+                        onClick={insertNumberedList}
                         title="Numbered List"
                       >
                         <span className="text-sm">1.</span>
                       </button>
                     </div>
+                    <div className="w-px h-4 bg-gray-300"></div>
+                    <div className="text-xs text-gray-500">
+                      Press Tab for indentation
+                    </div>
                   </div>
                   
-                  {/* Content Area */}
+                  {/* Enhanced Content Area */}
                   <div className="flex-1 p-6">
                     <div className="h-full flex flex-col">
                       <input
@@ -315,13 +487,15 @@ const Notes = ({ selectedDate }: NotesProps) => {
                         className="w-full bg-transparent text-2xl font-bold mb-6 outline-none border-b border-gray-200 focus:border-yellow-400 transition-all pb-2"
                         style={{ fontFamily: 'inherit' }}
                       />
-                      <textarea
-                        ref={textareaRef}
-                        value={content}
-                        onChange={e => setContent(e.target.value)}
-                        placeholder="Start writing your note..."
-                        className="w-full bg-transparent text-base font-normal outline-none flex-1 resize-none border-none focus:ring-0 leading-relaxed"
+                      <div
+                        ref={contentEditableRef}
+                        contentEditable
+                        onInput={handleContentChange}
+                        onKeyDown={handleKeyDown}
+                        className="w-full bg-transparent text-base font-normal outline-none flex-1 resize-none border-none focus:ring-0 leading-relaxed min-h-[200px] whitespace-pre-wrap focus:bg-gray-50/50 transition-colors"
                         style={{ fontFamily: 'inherit' }}
+                        suppressContentEditableWarning={true}
+                        data-placeholder="Start writing your note..."
                       />
                     </div>
                   </div>
@@ -375,7 +549,42 @@ const Notes = ({ selectedDate }: NotesProps) => {
                   {/* Note Content */}
                   <div className="flex-1 p-6 overflow-y-auto">
                     <div className="prose prose-gray max-w-none">
-                      <ReactMarkdown>{content || '*No content*'}</ReactMarkdown>
+                      {content ? (
+                        <div className="font-normal leading-relaxed">
+                          <ReactMarkdown 
+                            components={{
+                              p: ({children}) => <div className="whitespace-pre-wrap mb-2">{children}</div>,
+                              h1: ({children}) => <h1 className="text-4xl font-bold mb-4 mt-6">{children}</h1>,
+                              h2: ({children}) => <h2 className="text-2xl font-bold mb-3 mt-5">{children}</h2>,
+                              h3: ({children}) => <h3 className="text-xl font-bold mb-2 mt-4">{children}</h3>,
+                              ul: ({children}) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                              ol: ({children}) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                              li: ({children}) => <li className="whitespace-pre-wrap">{children}</li>,
+                              blockquote: ({children}) => (
+                                <blockquote className="border-l-4 border-gray-300 pl-4 py-2 my-4 bg-gray-50 italic">
+                                  {children}
+                                </blockquote>
+                              ),
+                              code: ({children, className}) => {
+                                if (className) {
+                                  // Code block
+                                  return (
+                                    <pre className="bg-gray-100 p-4 rounded-lg overflow-x-auto my-4">
+                                      <code className="text-sm font-mono">{children}</code>
+                                    </pre>
+                                  );
+                                }
+                                // Inline code
+                                return <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">{children}</code>;
+                              },
+                            }}
+                          >
+                            {content}
+                          </ReactMarkdown>
+                        </div>
+                      ) : (
+                        <div className="text-gray-500 italic">No content</div>
+                      )}
                     </div>
                   </div>
                   

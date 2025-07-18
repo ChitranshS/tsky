@@ -1,6 +1,6 @@
 import { Todo, Note, TodoList, CalendarDay } from './types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tsky-sigma.vercel.app';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 async function fetcher(url: string, options: RequestInit = {}) {
   const token = localStorage.getItem('tasky_token');
