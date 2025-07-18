@@ -149,6 +149,8 @@ const Notes = ({ selectedDate }: NotesProps) => {
     setContent(newContent);
   };
 
+
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Tab') {
       e.preventDefault();
@@ -200,6 +202,14 @@ const Notes = ({ selectedDate }: NotesProps) => {
           }
         }
       }
+    } else if (e.key === 'b' && (e.metaKey || e.ctrlKey)) {
+      // Cmd+B or Ctrl+B for bold
+      e.preventDefault();
+      insertBold();
+    } else if (e.key === 'i' && (e.metaKey || e.ctrlKey)) {
+      // Cmd+I or Ctrl+I for italic
+      e.preventDefault();
+      insertItalic();
     }
   };
 
@@ -232,11 +242,61 @@ const Notes = ({ selectedDate }: NotesProps) => {
   };
 
   const insertBold = () => {
-    insertText('**bold text**');
+    if (!contentEditableRef.current) return;
+    
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    
+    const range = selection.getRangeAt(0);
+    const selectedText = range.toString();
+    
+    if (selectedText) {
+      // If text is selected, wrap it with **
+      const newText = `**${selectedText}**`;
+      range.deleteContents();
+      range.insertNode(document.createTextNode(newText));
+    } else {
+      // If no text selected, insert ** at cursor
+      const textNode = document.createTextNode('**bold text**');
+      range.insertNode(textNode);
+      // Position cursor between ** and **
+      range.setStart(textNode, 2);
+      range.setEnd(textNode, textNode.length - 2);
+    }
+    
+    selection.removeAllRanges();
+    selection.addRange(range);
+    setContent(contentEditableRef.current.innerText);
+    contentEditableRef.current.focus();
   };
 
   const insertItalic = () => {
-    insertText('*italic text*');
+    if (!contentEditableRef.current) return;
+    
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    
+    const range = selection.getRangeAt(0);
+    const selectedText = range.toString();
+    
+    if (selectedText) {
+      // If text is selected, wrap it with *
+      const newText = `*${selectedText}*`;
+      range.deleteContents();
+      range.insertNode(document.createTextNode(newText));
+    } else {
+      // If no text selected, insert * at cursor
+      const textNode = document.createTextNode('*italic text*');
+      range.insertNode(textNode);
+      // Position cursor between * and *
+      range.setStart(textNode, 1);
+      range.setEnd(textNode, textNode.length - 1);
+    }
+    
+    selection.removeAllRanges();
+    selection.addRange(range);
+    setContent(contentEditableRef.current.innerText);
+    contentEditableRef.current.focus();
   };
 
   const insertUnderline = () => {
@@ -354,8 +414,8 @@ const Notes = ({ selectedDate }: NotesProps) => {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-all">
-                      <div className="bg-white text-gray-900 rounded-2xl shadow-2xl w-[90vw] h-[90vh] flex flex-col relative animate-fade-in font-sans overflow-hidden">
-              {/* Header */}
+          <div className="bg-white text-gray-900 rounded-2xl shadow-2xl w-[90vw] h-[90vh] flex flex-col relative animate-fade-in font-sans overflow-hidden">
+            {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-gray-100 flex-shrink-0">
               <h2 className="text-xl font-semibold text-gray-900">
                 {isEditing ? (activeNote ? 'Edit Note' : 'New Note') : 'View Note'}
