@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { getTodos, addTodo, updateTodo, deleteTodo, reorderTodos } from '../lib/api';
 import { Todo } from '../lib/types';
+import ReactMarkdown from 'react-markdown';
 
 interface TodoListProps {
   selectedDate?: string;
@@ -23,6 +24,7 @@ const TodoList = ({ selectedDate, selectedList, isCompactMode }: TodoListProps) 
   const [editText, setEditText] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editImportant, setEditImportant] = useState(false);
+  const descriptionEditableRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchTodos = async () => {
@@ -327,6 +329,13 @@ const TodoList = ({ selectedDate, selectedList, isCompactMode }: TodoListProps) 
     setEditText(todo.text);
     setEditDescription(todo.description);
     setEditImportant(todo.isImportant);
+    
+    // Set content in the contentEditable div after a brief delay
+    setTimeout(() => {
+      if (descriptionEditableRef.current) {
+        descriptionEditableRef.current.innerText = todo.description;
+      }
+    }, 100);
   };
 
   const handleSaveEdit = async () => {
@@ -361,6 +370,154 @@ const TodoList = ({ selectedDate, selectedList, isCompactMode }: TodoListProps) 
     setEditText('');
     setEditDescription('');
     setEditImportant(false);
+    
+    // Clear the contentEditable div
+    if (descriptionEditableRef.current) {
+      descriptionEditableRef.current.innerText = '';
+    }
+  };
+
+  // Enhanced content editing functions for description
+  const handleDescriptionChange = (e: React.FormEvent<HTMLDivElement>) => {
+    const newDescription = e.currentTarget.innerText;
+    setEditDescription(newDescription);
+  };
+
+  const insertText = (text: string) => {
+    if (!descriptionEditableRef.current) return;
+    
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    
+    const range = selection.getRangeAt(0);
+    const textNode = document.createTextNode(text);
+    range.deleteContents();
+    range.insertNode(textNode);
+    range.setStartAfter(textNode);
+    range.setEndAfter(textNode);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    
+    // Update content state
+    setEditDescription(descriptionEditableRef.current.innerText);
+    descriptionEditableRef.current.focus();
+  };
+
+  const insertBold = () => {
+    if (!descriptionEditableRef.current) return;
+    
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    
+    const range = selection.getRangeAt(0);
+    const selectedText = range.toString();
+    
+    if (selectedText) {
+      // If text is selected, wrap it with **
+      const newText = `**${selectedText}**`;
+      range.deleteContents();
+      range.insertNode(document.createTextNode(newText));
+    } else {
+      // If no text selected, insert ** at cursor
+      const textNode = document.createTextNode('**bold text**');
+      range.insertNode(textNode);
+      // Position cursor between ** and **
+      range.setStart(textNode, 2);
+      range.setEnd(textNode, textNode.length - 2);
+    }
+    
+    selection.removeAllRanges();
+    selection.addRange(range);
+    setEditDescription(descriptionEditableRef.current.innerText);
+    descriptionEditableRef.current.focus();
+  };
+
+  const insertItalic = () => {
+    if (!descriptionEditableRef.current) return;
+    
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    
+    const range = selection.getRangeAt(0);
+    const selectedText = range.toString();
+    
+    if (selectedText) {
+      // If text is selected, wrap it with *
+      const newText = `*${selectedText}*`;
+      range.deleteContents();
+      range.insertNode(document.createTextNode(newText));
+    } else {
+      // If no text selected, insert * at cursor
+      const textNode = document.createTextNode('*italic text*');
+      range.insertNode(textNode);
+      // Position cursor between * and *
+      range.setStart(textNode, 1);
+      range.setEnd(textNode, textNode.length - 1);
+    }
+    
+    selection.removeAllRanges();
+    selection.addRange(range);
+    setEditDescription(descriptionEditableRef.current.innerText);
+    descriptionEditableRef.current.focus();
+  };
+
+  const insertBulletPoint = () => {
+    insertText('• ');
+  };
+
+  const insertNumberedList = () => {
+    insertText('1. ');
+  };
+
+  const insertQuote = () => {
+    insertText('> ');
+  };
+
+  const insertCodeBlock = () => {
+    insertText('```\n\n```');
+  };
+
+  const insertHeading1 = () => {
+    insertText('# ');
+  };
+
+  const insertHeading2 = () => {
+    insertText('## ');
+  };
+
+  const insertHeading3 = () => {
+    insertText('### ');
+  };
+
+  const handleDescriptionKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      
+      const range = selection.getRangeAt(0);
+      const tabNode = document.createTextNode('\t');
+      range.deleteContents();
+      range.insertNode(tabNode);
+      range.setStartAfter(tabNode);
+      range.setEndAfter(tabNode);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      
+      // Update content state
+      if (descriptionEditableRef.current) {
+        setEditDescription(descriptionEditableRef.current.innerText);
+      }
+    } else if (e.key === 'b' && (e.metaKey || e.ctrlKey)) {
+      // Cmd+B or Ctrl+B for bold
+      e.preventDefault();
+      insertBold();
+    } else if (e.key === 'i' && (e.metaKey || e.ctrlKey)) {
+      // Cmd+I or Ctrl+I for italic
+      e.preventDefault();
+      insertItalic();
+    }
   };
 
   const importantTodos = todos.filter((todo) => todo.isImportant && !todo.completed);
@@ -452,12 +609,102 @@ const TodoList = ({ selectedDate, selectedList, isCompactMode }: TodoListProps) 
                       className="w-full bg-white text-lg sm:text-2xl lg:text-3xl font-black text-gray-900 rounded-xl px-4 py-2 border border-gray-200 focus:border-yellow-400 focus:outline-none"
                       placeholder="Todo text..."
                     />
-                    <textarea
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      className="w-full bg-white text-sm sm:text-lg text-gray-600 rounded-xl px-4 py-2 border border-gray-200 focus:border-yellow-400 focus:outline-none resize-none"
-                      placeholder="Description..."
-                      rows={2}
+                    
+                    {/* Formatting Toolbar */}
+                    <div className="flex items-center gap-2 p-2 border border-gray-200 rounded-lg bg-gray-50">
+                      <div className="flex items-center gap-1">
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertHeading1}
+                          title="Heading 1"
+                        >
+                          <span className="font-bold text-xs">H1</span>
+                        </button>
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertHeading2}
+                          title="Heading 2"
+                        >
+                          <span className="font-bold text-xs">H2</span>
+                        </button>
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertHeading3}
+                          title="Heading 3"
+                        >
+                          <span className="font-bold text-xs">H3</span>
+                        </button>
+                      </div>
+                      <div className="w-px h-4 bg-gray-300"></div>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertBold}
+                          title="Bold"
+                        >
+                          <span className="font-bold text-xs">B</span>
+                        </button>
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertItalic}
+                          title="Italic"
+                        >
+                          <span className="italic text-xs">I</span>
+                        </button>
+                      </div>
+                      <div className="w-px h-4 bg-gray-300"></div>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertBulletPoint}
+                          title="Bullet List"
+                        >
+                          <span className="text-xs">•</span>
+                        </button>
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertNumberedList}
+                          title="Numbered List"
+                        >
+                          <span className="text-xs">1.</span>
+                        </button>
+                      </div>
+                      <div className="w-px h-4 bg-gray-300"></div>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertQuote}
+                          title="Quote"
+                        >
+                          <span className="text-xs">"</span>
+                        </button>
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertCodeBlock}
+                          title="Code Block"
+                        >
+                          <span className="font-mono text-xs">{`{}`}</span>
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div
+                      ref={descriptionEditableRef}
+                      contentEditable
+                      onInput={handleDescriptionChange}
+                      onKeyDown={handleDescriptionKeyDown}
+                      className="w-full bg-white text-sm sm:text-lg text-gray-600 rounded-xl px-4 py-2 border border-gray-200 focus:border-yellow-400 focus:outline-none min-h-[80px] whitespace-pre-wrap focus:bg-gray-50/50 transition-colors"
+                      suppressContentEditableWarning={true}
+                      data-placeholder="Description..."
                     />
                     <div className="flex items-center justify-between">
                       <label className="flex items-center gap-2 cursor-pointer">
@@ -506,9 +753,38 @@ const TodoList = ({ selectedDate, selectedList, isCompactMode }: TodoListProps) 
                         {todo.text}
                       </span>
                       {todo.description && (
-                        <p className="text-sm sm:text-lg text-gray-600 mt-1 sm:mt-2">
-                          {todo.description}
-                        </p>
+                        <div className="text-sm sm:text-lg text-gray-600 mt-1 sm:mt-2">
+                          <ReactMarkdown 
+                            components={{
+                              p: ({children}) => <div className="whitespace-pre-wrap mb-2">{children}</div>,
+                              h1: ({children}) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                              h2: ({children}) => <h2 className="text-base font-bold mb-1">{children}</h2>,
+                              h3: ({children}) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
+                              ul: ({children}) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                              ol: ({children}) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                              li: ({children}) => <li className="whitespace-pre-wrap">{children}</li>,
+                              blockquote: ({children}) => (
+                                <blockquote className="border-l-4 border-gray-300 pl-2 py-1 my-2 bg-gray-50 italic">
+                                  {children}
+                                </blockquote>
+                              ),
+                              code: ({children, className}) => {
+                                if (className) {
+                                  // Code block
+                                  return (
+                                    <pre className="bg-gray-100 p-2 rounded my-2 overflow-x-auto">
+                                      <code className="text-xs font-mono">{children}</code>
+                                    </pre>
+                                  );
+                                }
+                                // Inline code
+                                return <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">{children}</code>;
+                              },
+                            }}
+                          >
+                            {todo.description}
+                          </ReactMarkdown>
+                        </div>
                       )}
                     </div>
                     <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
@@ -581,22 +857,112 @@ const TodoList = ({ selectedDate, selectedList, isCompactMode }: TodoListProps) 
                   onDrop={(e) => handleDrop(e, todo.id)}
                 >
                   {editingTodo?.id === todo.id ? (
-                    // Edit Mode
-                    <div className="space-y-4">
-                      <input
-                        type="text"
-                        value={editText}
-                        onChange={(e) => setEditText(e.target.value)}
-                        className="w-full bg-white text-lg font-medium text-gray-900 rounded-xl px-4 py-2 border border-gray-200 focus:border-purple-400 focus:outline-none"
-                        placeholder="Todo text..."
-                      />
-                      <textarea
-                        value={editDescription}
-                        onChange={(e) => setEditDescription(e.target.value)}
-                        className="w-full bg-white text-sm text-gray-600 rounded-xl px-4 py-2 border border-gray-200 focus:border-purple-400 focus:outline-none resize-none"
-                        placeholder="Description..."
-                        rows={2}
-                      />
+                                      // Edit Mode
+                  <div className="space-y-4">
+                    <input
+                      type="text"
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      className="w-full bg-white text-lg font-medium text-gray-900 rounded-xl px-4 py-2 border border-gray-200 focus:border-purple-400 focus:outline-none"
+                      placeholder="Todo text..."
+                    />
+                    
+                    {/* Formatting Toolbar */}
+                    <div className="flex items-center gap-2 p-2 border border-gray-200 rounded-lg bg-gray-50">
+                      <div className="flex items-center gap-1">
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertHeading1}
+                          title="Heading 1"
+                        >
+                          <span className="font-bold text-xs">H1</span>
+                        </button>
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertHeading2}
+                          title="Heading 2"
+                        >
+                          <span className="font-bold text-xs">H2</span>
+                        </button>
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertHeading3}
+                          title="Heading 3"
+                        >
+                          <span className="font-bold text-xs">H3</span>
+                        </button>
+                      </div>
+                      <div className="w-px h-4 bg-gray-300"></div>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertBold}
+                          title="Bold"
+                        >
+                          <span className="font-bold text-xs">B</span>
+                        </button>
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertItalic}
+                          title="Italic"
+                        >
+                          <span className="italic text-xs">I</span>
+                        </button>
+                      </div>
+                      <div className="w-px h-4 bg-gray-300"></div>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertBulletPoint}
+                          title="Bullet List"
+                        >
+                          <span className="text-xs">•</span>
+                        </button>
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertNumberedList}
+                          title="Numbered List"
+                        >
+                          <span className="text-xs">1.</span>
+                        </button>
+                      </div>
+                      <div className="w-px h-4 bg-gray-300"></div>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertQuote}
+                          title="Quote"
+                        >
+                          <span className="text-xs">"</span>
+                        </button>
+                        <button 
+                          className="p-1 rounded hover:bg-white transition-all" 
+                          type="button" 
+                          onClick={insertCodeBlock}
+                          title="Code Block"
+                        >
+                          <span className="font-mono text-xs">{`{}`}</span>
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div
+                      ref={descriptionEditableRef}
+                      contentEditable
+                      onInput={handleDescriptionChange}
+                      onKeyDown={handleDescriptionKeyDown}
+                      className="w-full bg-white text-sm text-gray-600 rounded-xl px-4 py-2 border border-gray-200 focus:border-purple-400 focus:outline-none min-h-[80px] whitespace-pre-wrap focus:bg-gray-50/50 transition-colors"
+                      suppressContentEditableWarning={true}
+                      data-placeholder="Description..."
+                    />
                       <div className="flex items-center justify-between">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
@@ -644,9 +1010,38 @@ const TodoList = ({ selectedDate, selectedList, isCompactMode }: TodoListProps) 
                           {todo.text}
                         </span>
                         {todo.description && (
-                          <p className="text-sm text-gray-600 mt-1">
-                            {todo.description}
-                          </p>
+                          <div className="text-sm text-gray-600 mt-1">
+                            <ReactMarkdown 
+                              components={{
+                                p: ({children}) => <div className="whitespace-pre-wrap mb-2">{children}</div>,
+                                h1: ({children}) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                                h2: ({children}) => <h2 className="text-base font-bold mb-1">{children}</h2>,
+                                h3: ({children}) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
+                                ul: ({children}) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                                ol: ({children}) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                                li: ({children}) => <li className="whitespace-pre-wrap">{children}</li>,
+                                blockquote: ({children}) => (
+                                  <blockquote className="border-l-4 border-gray-300 pl-2 py-1 my-2 bg-gray-50 italic">
+                                    {children}
+                                  </blockquote>
+                                ),
+                                code: ({children, className}) => {
+                                  if (className) {
+                                    // Code block
+                                    return (
+                                      <pre className="bg-gray-100 p-2 rounded my-2 overflow-x-auto">
+                                        <code className="text-xs font-mono">{children}</code>
+                                      </pre>
+                                    );
+                                  }
+                                  // Inline code
+                                  return <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">{children}</code>;
+                                },
+                              }}
+                            >
+                              {todo.description}
+                            </ReactMarkdown>
+                          </div>
                         )}
                       </div>
                       <div className="flex gap-2">

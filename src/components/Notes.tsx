@@ -141,7 +141,14 @@ const Notes = ({ selectedDate }: NotesProps) => {
     });
   };
 
-  const filteredNotes = showOnlyImportant ? notes.filter(n => n.isImportant) : notes;
+  const filteredNotes = showOnlyImportant 
+    ? notes.filter(n => n.isImportant) 
+    : notes.sort((a, b) => {
+        // Important notes first, then by creation date (newest first)
+        if (a.isImportant && !b.isImportant) return -1;
+        if (!a.isImportant && b.isImportant) return 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
 
   // Enhanced content editing functions
   const handleContentChange = (e: React.FormEvent<HTMLDivElement>) => {
